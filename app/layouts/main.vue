@@ -16,8 +16,10 @@ const pageTitle = computed(() => {
 
   return props.title.charAt(0).toUpperCase() + props.title.slice(1);
 });
+
+const nameApp = config.public.appName || "ERP System";
 useHead({
-  title: pageTitle.value + " - " + config.public.appName,
+  title: pageTitle.value + " - " + nameApp,
   meta: [{ name: "description", content: "ERP System" }],
 });
 const sidebarOpen = ref(false);
