@@ -10,12 +10,17 @@ import {
   Settings,
   LogOut,
   X,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-vue-next";
 import { ref, computed } from "vue";
 import { useTheme } from "~/composables/useTheme";
+import { useRouter } from "vue-router";
 
 const props = defineProps<{
   sidebarOpen: boolean;
+  sidebarCollapsed: boolean;
+  isMobile: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -27,6 +32,7 @@ const { isDark, toggleTheme } = useTheme();
 const isProfileOpen = ref(false);
 const isSearchOpen = ref(false);
 const searchQuery = ref("");
+const router = useRouter();
 const notifications = ref([
   { id: 1, title: "New order received", time: "5 min ago", unread: true },
   { id: 2, title: "Stock low: Product A", time: "1 hour ago", unread: true },
@@ -64,15 +70,33 @@ if (typeof window !== "undefined") {
     }
   });
 }
+
+const handleLogout = () => {
+  router.push("/auth/login");
+};
 </script>
 
 <template>
   <header
-    class="fixed top-0 right-0 left-0 lg:left-72 z-40 h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 transition-all duration-300"
+    :class="[
+      'fixed top-0 right-0 z-40 h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 transition-all duration-300',
+      isMobile ? 'left-0' : (sidebarCollapsed ? 'lg:left-20' : 'lg:left-72'),
+      'left-0',
+    ]"
   >
     <div class="h-full px-4 flex items-center justify-between">
       <!-- Left side -->
       <div class="flex items-center gap-4">
+        <!-- Desktop sidebar toggle button -->
+        <button
+          @click="emit('toggleSidebar')"
+          class="hidden lg:flex p-2 text-gray-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        >
+          <PanelLeftOpen v-if="sidebarCollapsed" class="w-5 h-5" />
+          <PanelLeftClose v-else class="w-5 h-5" />
+        </button>
+
         <!-- Mobile menu button -->
         <button
           @click="emit('toggleSidebar')"
@@ -114,7 +138,7 @@ if (typeof window !== "undefined") {
           class="p-2 text-gray-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
         >
-          <Sun v-if="isDark" class="w-5 h-5 text-yellow-500" />
+          <Sun v-if="isDark" class="w-5 h-5 text-gray-300" />
           <Moon v-else class="w-5 h-5" />
         </button>
 
@@ -245,6 +269,8 @@ if (typeof window !== "undefined") {
               </div>
               <div class="py-1 border-t border-gray-200 dark:border-gray-700">
                 <button
+                  type="button"
+                  @click="handleLogout"
                   class="flex items-center gap-3 w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
                   <LogOut class="w-4 h-4" />

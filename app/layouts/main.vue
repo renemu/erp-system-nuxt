@@ -22,23 +22,44 @@ useHead({
   title: pageTitle.value + " - " + nameApp,
   meta: [{ name: "description", content: "ERP System" }],
 });
-const sidebarOpen = ref(false);
+
+const sidebarOpen = ref(true);
+const sidebarCollapsed = ref(false);
 const isMobile = ref(false);
 
 const toggleSidebar = () => {
-  sidebarOpen.value = !sidebarOpen.value;
+  if (isMobile.value) {
+    // On mobile, toggle open/close
+    sidebarOpen.value = !sidebarOpen.value;
+  } else {
+    // On desktop, toggle collapsed/expanded
+    sidebarCollapsed.value = !sidebarCollapsed.value;
+  }
 };
 
 const closeSidebar = () => {
-  sidebarOpen.value = false;
+  if (isMobile.value) {
+    sidebarOpen.value = false;
+  }
 };
 
 const checkMobile = () => {
   isMobile.value = window.innerWidth < 1024;
-  if (!isMobile.value) {
+  if (isMobile.value) {
+    sidebarOpen.value = false;
+    sidebarCollapsed.value = false;
+  } else {
     sidebarOpen.value = true;
   }
 };
+
+// Computed for main content margin
+const mainMarginClass = computed(() => {
+  if (isMobile.value) {
+    return 'lg:ml-0';
+  }
+  return sidebarCollapsed.value ? 'lg:ml-20' : 'lg:ml-72';
+});
 
 onMounted(() => {
   checkMobile();
@@ -55,12 +76,18 @@ onUnmounted(() => {
     class="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-300"
   >
     <!-- Navbar -->
-    <Navbar :sidebar-open="sidebarOpen" @toggle-sidebar="toggleSidebar" />
+    <Navbar 
+      :sidebar-open="sidebarOpen" 
+      :sidebar-collapsed="sidebarCollapsed"
+      :is-mobile="isMobile"
+      @toggle-sidebar="toggleSidebar" 
+    />
 
     <!-- Sidebar -->
     <Sidebar
       :is-open="sidebarOpen"
       :is-mobile="isMobile"
+      :is-collapsed="sidebarCollapsed"
       @close="closeSidebar"
     />
 
@@ -68,7 +95,7 @@ onUnmounted(() => {
     <main
       :class="[
         'pt-16 min-h-[calc(100vh-56px)] transition-all duration-300',
-        'lg:ml-72',
+        mainMarginClass,
       ]"
     >
       <div class="p-4 md:p-6 lg:p-8">
@@ -77,7 +104,7 @@ onUnmounted(() => {
     </main>
 
     <!-- Footer -->
-    <div class="lg:ml-72 transition-all duration-300">
+    <div :class="['transition-all duration-300', mainMarginClass]">
       <Footer />
     </div>
   </div>

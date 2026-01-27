@@ -14,11 +14,12 @@ import {
   Truck,
   X,
 } from "lucide-vue-next";
-import { ref } from "vue";
+import { ref, computed } from "vue";
 
 const props = defineProps<{
   isOpen: boolean;
   isMobile: boolean;
+  isCollapsed: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -94,6 +95,10 @@ const bottomMenuItems: MenuItem[] = [
 const expandedMenus = ref<string[]>([]);
 
 const toggleMenu = (menuName: string) => {
+  // Don't expand menus when collapsed on desktop
+  if (props.isCollapsed && !props.isMobile) {
+    return;
+  }
   const index = expandedMenus.value.indexOf(menuName);
   if (index > -1) {
     expandedMenus.value.splice(index, 1);
@@ -109,75 +114,103 @@ const handleNavClick = () => {
     emit("close");
   }
 };
+
+// Computed for sidebar width class
+const sidebarWidthClass = computed(() => {
+  if (props.isMobile) {
+    return 'w-72';
+  }
+  return props.isCollapsed ? 'w-20' : 'w-72';
+});
+
+// Computed for transform class
+const transformClass = computed(() => {
+  if (props.isMobile) {
+    return props.isOpen ? 'translate-x-0' : '-translate-x-full';
+  }
+  // Desktop always visible, just different width
+  return 'translate-x-0';
+});
 </script>
 
 <template>
   <aside
     :class="[
-      'fixed top-0 left-0 z-50 h-screen transition-transform duration-300 ease-in-out',
+      'fixed top-0 left-0 z-50 h-screen transition-all duration-300 ease-in-out',
       'bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800',
-      'w-72',
-      isOpen ? 'translate-x-0' : '-translate-x-full',
-      'lg:translate-x-0',
+      sidebarWidthClass,
+      transformClass,
     ]"
   >
     <div class="h-full flex flex-col overflow-hidden">
       <!-- Logo & Brand -->
       <div
-        class="h-16 px-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-800"
+        :class="[
+          'h-16 flex items-center border-b border-gray-200 dark:border-gray-800',
+          isCollapsed && !isMobile ? 'px-2 justify-center' : 'px-4 justify-between'
+        ]"
       >
-        <NuxtLink to="/" class="flex items-center gap-3">
+        <NuxtLink to="/" :class="['flex items-center', isCollapsed && !isMobile ? 'justify-center' : 'gap-3']">
           <div
-            class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/20"
+            class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/20 flex-shrink-0"
           >
             <span class="text-white font-bold text-lg">ER</span>
           </div>
-          <div>
-            <p class="text-lg font-bold text-gray-900 dark:text-white">
+          <div v-if="!isCollapsed || isMobile" class="overflow-hidden">
+            <p class="text-lg font-bold text-gray-900 dark:text-white whitespace-nowrap">
               ERP System
             </p>
-            <p class="text-xs text-gray-500 dark:text-gray-400">
+            <p class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
               Enterprise Resource
             </p>
           </div>
         </NuxtLink>
-        <!-- Button to toggle sidebar -->
+        <!-- Button to toggle sidebar (mobile only) -->
         <Button
+          v-if="isMobile"
           variant="ghost"
           size="sm"
           @click="emit('close')"
-          class="md:hidden block"
         >
           <X class="w-5 h-5" />
         </Button>
       </div>
 
       <!-- Navigation -->
-      <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+      <nav :class="['flex-1 overflow-y-auto py-4 space-y-1', isCollapsed && !isMobile ? 'px-2' : 'px-3']">
         <template v-for="item in menuItems" :key="item.name">
           <!-- Menu with children -->
-          <div v-if="item.children">
+          <div v-if="item.children" class="relative group">
             <button
               @click="toggleMenu(item.name)"
-              class="flex items-center w-full p-3 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
+              :class="[
+                'flex items-center w-full p-3 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors',
+                isCollapsed && !isMobile ? 'justify-center' : ''
+              ]"
+              :title="isCollapsed && !isMobile ? item.name : undefined"
             >
               <component
                 :is="item.icon"
-                class="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors"
+                class="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors flex-shrink-0"
               />
-              <span class="flex-1 ml-3 text-left text-sm font-medium">{{
-                item.name
-              }}</span>
-              <ChevronDown
-                v-if="isExpanded(item.name)"
-                class="w-4 h-4 text-gray-500 transition-transform"
-              />
-              <ChevronRight
-                v-else
-                class="w-4 h-4 text-gray-500 transition-transform"
-              />
+              <template v-if="!isCollapsed || isMobile">
+                <span class="flex-1 ml-3 text-left text-sm font-medium whitespace-nowrap">{{
+                  item.name
+                }}</span>
+                <ChevronDown
+                  v-if="isExpanded(item.name)"
+                  class="w-4 h-4 text-gray-500 transition-transform"
+                />
+                <ChevronRight
+                  v-else
+                  class="w-4 h-4 text-gray-500 transition-transform"
+                />
+              </template>
             </button>
+            
+            <!-- Submenu for expanded sidebar -->
             <transition
+              v-if="!isCollapsed || isMobile"
               enter-active-class="transition-all duration-200 ease-out"
               leave-active-class="transition-all duration-200 ease-in"
               enter-from-class="opacity-0 max-h-0"
@@ -193,7 +226,7 @@ const handleNavClick = () => {
                   <NuxtLink
                     :to="child.path"
                     @click="handleNavClick"
-                    class="block px-3 py-2 text-sm text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+                    class="block px-3 py-2 text-sm text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-purple-600 dark:hover:text-purple-400 transition-colors whitespace-nowrap"
                     active-class="bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 font-medium"
                   >
                     {{ child.name }}
@@ -201,6 +234,27 @@ const handleNavClick = () => {
                 </li>
               </ul>
             </transition>
+
+            <!-- Tooltip submenu for collapsed sidebar (desktop only) -->
+            <div
+              v-if="isCollapsed && !isMobile"
+              class="absolute left-full top-0 ml-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50"
+            >
+              <div class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+                <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ item.name }}</span>
+              </div>
+              <ul class="py-1">
+                <li v-for="child in item.children" :key="child.path">
+                  <NuxtLink
+                    :to="child.path"
+                    class="block px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+                    active-class="bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 font-medium"
+                  >
+                    {{ child.name }}
+                  </NuxtLink>
+                </li>
+              </ul>
+            </div>
           </div>
 
           <!-- Single menu item -->
@@ -208,35 +262,46 @@ const handleNavClick = () => {
             v-else
             :to="item.path!"
             @click="handleNavClick"
-            class="flex items-center p-3 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
+            :class="[
+              'flex items-center p-3 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group',
+              isCollapsed && !isMobile ? 'justify-center' : ''
+            ]"
             active-class="bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400"
+            :title="isCollapsed && !isMobile ? item.name : undefined"
           >
             <component
               :is="item.icon"
-              class="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors"
+              class="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors flex-shrink-0"
             />
-            <span class="ml-3 text-sm font-medium">{{ item.name }}</span>
+            <span v-if="!isCollapsed || isMobile" class="ml-3 text-sm font-medium whitespace-nowrap">{{ item.name }}</span>
           </NuxtLink>
         </template>
       </nav>
 
       <!-- Bottom Menu -->
       <div
-        class="px-3 py-4 border-t border-gray-200 dark:border-gray-800 space-y-1"
+        :class="[
+          'py-4 border-t border-gray-200 dark:border-gray-800 space-y-1',
+          isCollapsed && !isMobile ? 'px-2' : 'px-3'
+        ]"
       >
         <NuxtLink
           v-for="item in bottomMenuItems"
           :key="item.name"
           :to="item.path!"
           @click="handleNavClick"
-          class="flex items-center p-3 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
+          :class="[
+            'flex items-center p-3 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group',
+            isCollapsed && !isMobile ? 'justify-center' : ''
+          ]"
           active-class="bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400"
+          :title="isCollapsed && !isMobile ? item.name : undefined"
         >
           <component
             :is="item.icon"
-            class="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors"
+            class="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors flex-shrink-0"
           />
-          <span class="ml-3 text-sm font-medium">{{ item.name }}</span>
+          <span v-if="!isCollapsed || isMobile" class="ml-3 text-sm font-medium whitespace-nowrap">{{ item.name }}</span>
         </NuxtLink>
       </div>
     </div>
