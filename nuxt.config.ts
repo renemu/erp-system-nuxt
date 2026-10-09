@@ -8,7 +8,9 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      appName: process.env.NUXT_PUBLIC_APP_NAME,
+      // Fallback agar judul halaman dan footer tidak menjadi "undefined"
+      // saat NUXT_PUBLIC_APP_NAME belum diatur (mis. di Vercel).
+      appName: process.env.NUXT_PUBLIC_APP_NAME || "ERP System",
     },
   },
 });
