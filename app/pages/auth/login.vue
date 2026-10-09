@@ -40,7 +40,7 @@ const handleLogin = async () => {
     console.log("Login attempt:", form.value);
     
     // Redirect to dashboard on success
-    navigateTo("/");
+    navigateTo("/dashboard");
   } catch (error) {
     errorMessage.value = "Invalid email or password";
   } finally {
