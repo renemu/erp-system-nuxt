@@ -14,7 +14,8 @@ import {
   Truck,
   X,
 } from "lucide-vue-next";
-import { ref, computed } from "vue";
+import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
+import { useRoute } from "vue-router";
 
 const props = defineProps<{
   isOpen: boolean;
@@ -94,18 +95,96 @@ const bottomMenuItems: MenuItem[] = [
 
 const expandedMenus = ref<string[]>([]);
 
-const toggleMenu = (menuName: string) => {
-  // Don't expand menus when collapsed on desktop
-  if (props.isCollapsed && !props.isMobile) {
+const route = useRoute();
+
+// Collapsed desktop mode: submenu is shown as a floating flyout.
+// It is teleported to <body> with fixed positioning so it is never clipped
+// by the sidebar's overflow container and always sits above other layers.
+const isCollapsedDesktop = computed(() => props.isCollapsed && !props.isMobile);
+
+const flyout = ref<{ name: string; top: number; left: number } | null>(null);
+let flyoutTimer: ReturnType<typeof setTimeout> | null = null;
+
+const activeFlyoutItem = computed(() =>
+  flyout.value ? menuItems.find((item) => item.name === flyout.value!.name) : undefined
+);
+
+const clearFlyoutTimer = () => {
+  if (flyoutTimer) {
+    clearTimeout(flyoutTimer);
+    flyoutTimer = null;
+  }
+};
+
+const closeFlyout = () => {
+  clearFlyoutTimer();
+  flyout.value = null;
+};
+
+const scheduleCloseFlyout = () => {
+  clearFlyoutTimer();
+  // Small delay so the pointer can travel from the icon to the flyout
+  flyoutTimer = setTimeout(() => {
+    flyout.value = null;
+  }, 150);
+};
+
+const openFlyout = (item: MenuItem, event: Event) => {
+  if (!isCollapsedDesktop.value || !item.children) return;
+  clearFlyoutTimer();
+
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  // Estimated height: header (~41px) + items (~36px each) + padding
+  const estimatedHeight = 41 + item.children.length * 36 + 8;
+  const maxTop = window.innerHeight - estimatedHeight - 8;
+
+  flyout.value = {
+    name: item.name,
+    top: Math.max(8, Math.min(rect.top, maxTop)),
+    left: rect.right + 8,
+  };
+};
+
+const toggleMenu = (item: MenuItem, event: Event) => {
+  // Collapsed desktop: click toggles the flyout (useful for touch/keyboard)
+  if (isCollapsedDesktop.value) {
+    if (flyout.value?.name === item.name) {
+      closeFlyout();
+    } else {
+      openFlyout(item, event);
+    }
     return;
   }
-  const index = expandedMenus.value.indexOf(menuName);
+
+  const index = expandedMenus.value.indexOf(item.name);
   if (index > -1) {
     expandedMenus.value.splice(index, 1);
   } else {
-    expandedMenus.value.push(menuName);
+    expandedMenus.value.push(item.name);
   }
 };
+
+const onDocumentClick = (event: MouseEvent) => {
+  if (!flyout.value) return;
+  const target = event.target as HTMLElement | null;
+  if (target?.closest("[data-sidebar-flyout], [data-sidebar-trigger]")) return;
+  closeFlyout();
+};
+
+onMounted(() => {
+  document.addEventListener("click", onDocumentClick);
+  window.addEventListener("resize", closeFlyout);
+});
+
+onBeforeUnmount(() => {
+  clearFlyoutTimer();
+  document.removeEventListener("click", onDocumentClick);
+  window.removeEventListener("resize", closeFlyout);
+});
+
+// Close the flyout on navigation and whenever the sidebar mode changes
+watch(() => route.path, closeFlyout);
+watch(isCollapsedDesktop, closeFlyout);
 
 const isExpanded = (menuName: string) => expandedMenus.value.includes(menuName);
 
@@ -177,12 +256,21 @@ const transformClass = computed(() => {
       </div>
 
       <!-- Navigation -->
-      <nav :class="['flex-1 overflow-y-auto py-4 space-y-1', isCollapsed && !isMobile ? 'px-2' : 'px-3']">
+      <nav
+        :class="['flex-1 overflow-y-auto py-4 space-y-1', isCollapsed && !isMobile ? 'px-2' : 'px-3']"
+        @scroll="closeFlyout"
+      >
         <template v-for="item in menuItems" :key="item.name">
           <!-- Menu with children -->
-          <div v-if="item.children" class="relative group">
+          <div
+            v-if="item.children"
+            class="relative group"
+            @mouseenter="openFlyout(item, $event)"
+            @mouseleave="scheduleCloseFlyout"
+          >
             <button
-              @click="toggleMenu(item.name)"
+              data-sidebar-trigger
+              @click="toggleMenu(item, $event)"
               :class="[
                 'flex items-center w-full p-3 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors',
                 isCollapsed && !isMobile ? 'justify-center' : ''
@@ -234,27 +322,6 @@ const transformClass = computed(() => {
                 </li>
               </ul>
             </transition>
-
-            <!-- Tooltip submenu for collapsed sidebar (desktop only) -->
-            <div
-              v-if="isCollapsed && !isMobile"
-              class="absolute left-full top-0 ml-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50"
-            >
-              <div class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-                <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ item.name }}</span>
-              </div>
-              <ul class="py-1">
-                <li v-for="child in item.children" :key="child.path">
-                  <NuxtLink
-                    :to="child.path"
-                    class="block px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
-                    active-class="bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 font-medium"
-                  >
-                    {{ child.name }}
-                  </NuxtLink>
-                </li>
-              </ul>
-            </div>
           </div>
 
           <!-- Single menu item -->
@@ -306,6 +373,47 @@ const transformClass = computed(() => {
       </div>
     </div>
   </aside>
+
+  <!-- Flyout submenu for collapsed sidebar (desktop only).
+       Teleported to <body> so it escapes the sidebar's overflow clipping
+       and stacks above the navbar, content and sidebar. -->
+  <Teleport to="body">
+    <transition
+      enter-active-class="transition duration-150 ease-out"
+      leave-active-class="transition duration-100 ease-in"
+      enter-from-class="opacity-0 -translate-x-1"
+      enter-to-class="opacity-100 translate-x-0"
+      leave-from-class="opacity-100 translate-x-0"
+      leave-to-class="opacity-0 -translate-x-1"
+    >
+      <div
+        v-if="flyout && activeFlyoutItem && isCollapsedDesktop"
+        data-sidebar-flyout
+        class="fixed z-[60] w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700"
+        :style="{ top: flyout.top + 'px', left: flyout.left + 'px' }"
+        @mouseenter="clearFlyoutTimer"
+        @mouseleave="scheduleCloseFlyout"
+      >
+        <div class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+          <span class="text-sm font-semibold text-gray-900 dark:text-white">{{
+            activeFlyoutItem.name
+          }}</span>
+        </div>
+        <ul class="py-1">
+          <li v-for="child in activeFlyoutItem.children" :key="child.path">
+            <NuxtLink
+              :to="child.path"
+              class="block px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+              active-class="bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 font-medium"
+              @click="closeFlyout"
+            >
+              {{ child.name }}
+            </NuxtLink>
+          </li>
+        </ul>
+      </div>
+    </transition>
+  </Teleport>
 
   <!-- Overlay for mobile -->
   <div
