@@ -35,7 +35,7 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
-  { name: "Dashboard", icon: Home, path: "/" },
+  { name: "Dashboard", icon: Home, path: "/dashboard" },
   {
     name: "Inventory",
     icon: Package,
@@ -229,7 +229,7 @@ const transformClass = computed(() => {
           isCollapsed && !isMobile ? 'px-2 justify-center' : 'px-4 justify-between'
         ]"
       >
-        <NuxtLink to="/" :class="['flex items-center', isCollapsed && !isMobile ? 'justify-center' : 'gap-3']">
+        <NuxtLink to="/dashboard" :class="['flex items-center', isCollapsed && !isMobile ? 'justify-center' : 'gap-3']">
           <div
             class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/20 flex-shrink-0"
           >
